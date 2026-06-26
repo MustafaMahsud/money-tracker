@@ -26,7 +26,7 @@ const $=s=>document.querySelector(s);const fmt=n=>`${state.currency} ${Number(n|
 let state=JSON.parse(localStorage.getItem('moneyflow-v2')||'null')||{currency:'PKR',transactions:[],loans:[]};
 function save(){localStorage.setItem('moneyflow-v2',JSON.stringify(state));render()}function toast(t){$('#toast').textContent=t;$('#toast').classList.add('show');setTimeout(()=>$('#toast').classList.remove('show'),1500)}
 function totals(){let income=0,expense=0,lent=0,borrowed=0;state.transactions.forEach(t=>{if(t.type==='income')income+=+t.amount;if(t.type==='expense')expense+=+t.amount});state.loans.forEach(l=>{let rem=Math.max(0,+l.amount-(+l.paid||0));if(l.kind==='lent')lent+=rem;else borrowed+=rem});return{income,expense,lent,borrowed,balance:income-expense-lent+borrowed}}
-function icon(c){return {food:'🍔',transport:'🚗',shopping:'🛍️',bills:'📱',health:'🏥',fun:'🎮',salary:'💼',business:'🏪',gift:'🎁',other:'📌'}[c]||'💰'}
+function icon(c){return {food:'🍔',transport:'🚗',dhobi:'👕'other:'📌'}[c]||'💰'}
 function setTab(tab){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));['home','add','loans','reports'].forEach(v=>$('#view-'+v).classList.toggle('hidden',v!==tab));render()}
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));$('#currencyBtn').onclick=()=>{let c=prompt('Currency label',state.currency);if(c){state.currency=c.toUpperCase().slice(0,5);save()}}
 function render(){let t=totals();$('#balance').textContent=fmt(t.balance);$('#currencyBtn').textContent=state.currency;renderHome(t);renderAdd();renderLoans(t);renderReports(t)}
