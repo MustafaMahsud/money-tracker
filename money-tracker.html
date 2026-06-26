@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Money Tracker">
+    <meta name="theme-color" content="#1f2937">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%233b82f6' width='180' height='180' rx='40'/><text x='50%' y='50%' font-size='70' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='middle'>💰</text></svg>">
+    <title>Money Tracker</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            user-select: none;
+        }
+        input, textarea, select {
+            -webkit-user-select: text;
+            user-select: text;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+                sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+        .safe-area-inset {
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .glass-effect {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+        .gradient-balance {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+        }
+        .transaction-enter {
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function MoneyTracker() {
+            const [balance, setBalance] = useState(0);
+            const [transactions, setTransactions] = useState([]);
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [formData, setFormData] = useState({
+                amount: '',
+                category: 'food',
+                description: '',
+                type: 'expense'
+            });
+
+            // Load data from localStorage on mount
+            useEffect(() => {
+                const saved = localStorage.getItem('moneyTrackerData');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    setBalance(data.balance);
+                    setTransactions(data.transactions);
+                }
+            }, []);
+
+            // Save data to localStorage whenever it changes
+            useEffect(() => {
+                localStorage.setItem('moneyTrackerData', JSON.stringify({
+                    balance,
+                    transactions
+                }));
+            }, [balance, transactions]);
+
+            const handleAddTransaction = (e) => {
+                e.preventDefault();
+                if (!formData.amount) return;
+
+                const amount = parseFloat(formData.amount);
+                if (isNaN(amount)) return;
+
+                const newTransaction = {
+                    id: Date.now(),
+                    type: formData.type,
+                    amount,
+                    category: formData.category,
+                    description: formData.description,
+                    date: new Date().toLocaleDateString(),
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                };
+
+                setTransactions([newTransaction, ...transactions]);
+
+                if (formData.type === 'income') {
+                    setBalance(balance + amount);
+                } else if (formData.type === 'expense') {
+                    setBalance(balance - amount);
+                } else if (formData.type === 'lend') {
+                    setBalance(balance - amount);
+                }
+
+                setFormData({
+                    amount: '',
+                    category: 'food',
+                    description: '',
+                    type: 'expense'
+                });
+            };
+
+            const deleteTransaction = (id) => {
+                const transaction = transactions.find(t => t.id === id);
+                if (transaction) {
+                    setTransactions(transactions.filter(t => t.id !== id));
+                    if (transaction.type === 'income') {
+                        setBalance(balance - transaction.amount);
+                    } else if (transaction.type === 'expense') {
+                        setBalance(balance + transaction.amount);
+                    } else if (transaction.type === 'lend') {
+                        setBalance(balance + transaction.amount);
+                    }
+                }
+            };
+
+            const getExpenses = () => transactions.filter(t => t.type === 'expense');
+            const getIncome = () => transactions.filter(t => t.type === 'income');
+            const getLoans = () => transactions.filter(t => t.type === 'lend');
+
+            const getCategoryIcon = (category) => {
+                const icons = {
+                    food: '🍔',
+                    transport: '🚗',
+                    entertainment: '🎬',
+                    shopping: '🛍️',
+                    utilities: '💡',
+                    health: '🏥',
+                    other: '📌',
+                    salary: '💼',
+                    bonus: '🎁',
+                    investment: '📈'
+                };
+                return icons[category] || '💰';
+            };
+
+            const getTypeColor = (type) => {
+                if (type === 'income') return 'text-green-400';
+                if (type === 'lend') return 'text-orange-400';
+                return 'text-red-400';
+            };
+
+            const getTypeLabel = (type) => {
+                if (type === 'income') return 'Income';
+                if (type === 'lend') return 'Lent Out';
+                return 'Spent';
+            };
+
+            return (
+                <div className="safe-area-inset min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+                    {/* Header */}
+                    <div className="gradient-balance text-white p-6 pt-8 rounded-b-3xl shadow-lg">
+                        <h1 className="text-2xl font-bold mb-2">Money Tracker</h1>
+                        <div className="text-5xl font-bold mb-1">
+                            {balance >= 0 ? '+' : ''}{balance.toFixed(2)}
+                        </div>
+                        <p className="text-blue-100 text-sm">Your Current Balance</p>
+                    </div>
+
+                    {/* Stats Cards */}
+                    <div className="px-4 mt-6 grid grid-cols-3 gap-3">
+                        <div className="glass-effect p-4 rounded-2xl text-center">
+                            <div className="text-2xl font-bold text-green-400">
+                                {getIncome().reduce((sum, t) => sum + t.amount, 0).toFixed(0)}
+                            </div>
+                            <p className="text-xs text-slate-400 mt-1">Income</p>
+                        </div>
+                        <div className="glass-effect p-4 rounded-2xl text-center">
+                            <div className="text-2xl font-bold text-red-400">
+                                {getExpenses().reduce((sum, t) => sum + t.amount, 0).toFixed(0)}
+                            </div>
+                            <p className="text-xs text-slate-400 mt-1">Spent</p>
+                        </div>
+                        <div className="glass-effect p-4 rounded-2xl text-center">
+                            <div className="text-2xl font-bold text-orange-400">
+                                {getLoans().reduce((sum, t) => sum + t.amount, 0).toFixed(0)}
+                            </div>
+                            <p className="text-xs text-slate-400 mt-1">Lent Out</p>
+                        </div>
+                    </div>
+
+                    {/* Navigation Tabs */}
+                    <div className="flex gap-2 px-4 mt-8 border-b border-slate-700">
+                        {[
+                            { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+                            { id: 'add', label: 'Add', icon: '➕' },
+                            { id: 'history', label: 'History', icon: '📜' }
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex-1 py-4 px-3 text-center font-semibold text-sm transition-all ${
+                                    activeTab === tab.id
+                                        ? 'text-blue-400 border-b-2 border-blue-400'
+                                        : 'text-slate-400'
+                                }`}
+                            >
+                                <span className="mr-1">{tab.icon}</span>
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Content */}
+                    <div className="pb-32">
+                        {/* Dashboard Tab */}
+                        {activeTab === 'dashboard' && (
+                            <div className="p-4 space-y-4">
+                                <div className="glass-effect p-6 rounded-2xl">
+                                    <h3 className="text-lg font-bold mb-4 text-slate-200">Recent Activity</h3>
+                                    {transactions.slice(0, 5).length === 0 ? (
+                                        <p className="text-slate-500 text-center py-8">No transactions yet</p>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {transactions.slice(0, 5).map(t => (
+                                                <div key={t.id} className="flex items-center justify-between p-3 bg-slate-900 rounded-xl hover:bg-slate-800 transition">
+                                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                        <span className="text-2xl">{getCategoryIcon(t.category)}</span>
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="font-semibold text-slate-200 truncate">{t.description || t.category}</p>
+                                                            <p className="text-xs text-slate-500">{t.date}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className={`font-bold text-right ml-2 ${getTypeColor(t.type)}`}>
+                                                        {t.type === 'income' ? '+' : '-'}{t.amount.toFixed(2)}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Add Transaction Tab */}
+                        {activeTab === 'add' && (
+                            <div className="p-4">
+                                <form onSubmit={handleAddTransaction} className="glass-effect p-6 rounded-2xl space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-300 mb-2">Type</label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {[
+                                                { value: 'income', label: 'Income', icon: '💰' },
+                                                { value: 'expense', label: 'Expense', icon: '💸' },
+                                                { value: 'lend', label: 'Lend Out', icon: '🤝' }
+                                            ].map(type => (
+                                                <button
+                                                    key={type.value}
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, type: type.value })}
+                                                    className={`p-3 rounded-xl font-semibold transition ${
+                                                        formData.type === type.value
+                                                            ? 'bg-blue-500 text-white'
+                                                            : 'bg-slate-700 text-slate-300'
+                                                    }`}
+                                                >
+                                                    <span className="block text-xl mb-1">{type.icon}</span>
+                                                    {type.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-300 mb-2">Amount</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.amount}
+                                            onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                                            className="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-300 mb-2">Category</label>
+                                        <select
+                                            value={formData.category}
+                                            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                                            className="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500"
+                                        >
+                                            {formData.type === 'income' ? (
+                                                <>
+                                                    <option value="salary">Salary</option>
+                                                    <option value="bonus">Bonus</option>
+                                                    <option value="investment">Investment</option>
+                                                    <option value="other">Other Income</option>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <option value="food">Food & Dining</option>
+                                                    <option value="transport">Transport</option>
+                                                    <option value="entertainment">Entertainment</option>
+                                                    <option value="shopping">Shopping</option>
+                                                    <option value="utilities">Utilities</option>
+                                                    <option value="health">Health</option>
+                                                    <option value="other">Other</option>
+                                                </>
+                                            )}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-300 mb-2">Description (Optional)</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Add a note..."
+                                            value={formData.description}
+                                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                            maxLength="50"
+                                            className="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-bold py-3 rounded-xl transition transform active:scale-95"
+                                    >
+                                        Add Transaction
+                                    </button>
+                                </form>
+                            </div>
+                        )}
+
+                        {/* History Tab */}
+                        {activeTab === 'history' && (
+                            <div className="p-4 space-y-4">
+                                {transactions.length === 0 ? (
+                                    <div className="glass-effect p-12 rounded-2xl text-center">
+                                        <p className="text-slate-400">No transactions yet. Start by adding one! 👆</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {transactions.map(t => (
+                                            <div
+                                                key={t.id}
+                                                className="transaction-enter glass-effect p-4 rounded-xl flex items-center justify-between hover:bg-slate-700 transition group"
+                                            >
+                                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                    <span className="text-3xl">{getCategoryIcon(t.category)}</span>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="font-semibold text-slate-200 capitalize truncate">{t.description || t.category}</p>
+                                                        <p className="text-xs text-slate-500">{t.date} at {t.time}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right ml-2">
+                                                    <p className={`font-bold ${getTypeColor(t.type)}`}>
+                                                        {t.type === 'income' ? '+' : '-'}{t.amount.toFixed(2)}
+                                                    </p>
+                                                    <p className="text-xs text-slate-500">{getTypeLabel(t.type)}</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => deleteTransaction(t.id)}
+                                                    className="ml-3 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition p-1"
+                                                    title="Delete"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<MoneyTracker />, document.getElementById('root'));
+
+        // Register Service Worker for offline support
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('data:text/javascript;base64,Ly8gU2ltcGxlIFNlcnZpY2UgV29ya2VyIGZvciBvZmZsaW5lIHN1cHBvcnQKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdpbnN0YWxsJywgZXZ0ID0+IHsKICBjb25zb2xlLmxvZygndGhlIHNlcnZpY2Ugd29ya2VyIGlzIGJlaW5nIGluc3RhbGxlZC4nKQogIHNlbGYuc2tpcFdhaXRpbmcoKQp9KQoKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdhY3RpdmF0ZScsIGV2dCA9PiB7CiAgY29uc29sZS5sb2coJ3RoZSBzZXJ2aWNlIHdvcmtlciBpcyBhY3RpdmF0aW5nLicpCiAgZXZ0LndhaXRVbnRpbChzZWxmLmNsaWVudHMuY2xhaW0oKSkKfSkK').catch(() => {});
+        }
+    </script>
+</body>
+</html>
